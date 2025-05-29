@@ -25,7 +25,7 @@ jobs:
             --clientid "${{ secrets.SF_CLIENT_ID }}" \
             --jwtkeyfile server.key \
             --setdefaultdevhubusername \
-            --instanceurl "${{ secrets.https://login.salesforce.com }}"
+            --instanceurl "${{ secrets.https://resilient-shark-5hhviu-dev-ed.trailblaze.lightning.force.com }}"
       - name: Deploy source
         run: |
           sfdx force:source:deploy -p force-app --json --loglevel fatal
