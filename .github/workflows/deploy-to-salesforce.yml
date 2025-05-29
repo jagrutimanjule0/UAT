@@ -27,8 +27,12 @@ jobs:
           wget https://developer.salesforce.com/media/salesforce-cli/sf/channels/stable/sf-linux-x64.tar.xz
           mkdir -p ~/cli/sf
           tar xJf sf-linux-x64.tar.xz -C ~/cli/sf --strip-components 1
-          echo "$HOME/cli/sf/bin" >> $GITHUB_PATH
-          sf version
+
+      - name: Add Salesforce CLI to PATH
+        run: echo "$HOME/cli/sf/bin" >> $GITHUB_PATH
+
+      - name: Verify Salesforce CLI installation
+        run: sf version
 
       - name: Authenticate with Salesforce UAT Org
         run: |
