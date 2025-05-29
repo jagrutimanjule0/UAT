@@ -1,31 +1,32 @@
-name: Deploy to Salesforce
-
-on:
-  push:
-    branches:
-      - UAT-Branch   # change this to your target branch
-
-jobs:
-  deploy:
-    runs-on: openjdk:17-slim
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Salesforce CLI
-        run: |
-          npm install sfdx-cli --global
-
-      - name: Authenticate to Salesforce (JWT)
-        run: |
-          echo "${{ secrets.SF_JWT_KEY }}" > server.key
-          sfdx auth:jwt:grant \
-            --username "${{ secrets.SF_USERNAME }}" \
-            --clientid "${{ secrets.SF_CLIENT_ID }}" \
-            --jwtkeyfile server.key \
-            --setdefaultdevhubusername \
-            --instanceurl "${{ secrets.SF_LOGIN_URL }}"
-      - name: Deploy source
-        run: |
-          sfdx force:source:deploy -p force-app --json --loglevel fatal
+name: Deploy to UAT
+  image: ubuntu:latest
+  stage: QA_deployment
+  before_script:
+    - apt-get update
+    - apt-get install -y wget default-jdk unzip xz-utils # Install JDK and wget
+    - wget https://developer.salesforce.com/media/salesforce-cli/sf/channels/stable/sf-linux-x64.tar.xz
+    - mkdir ~/cli
+    - mkdir ~/cli/sf
+    - tar xJf sf-linux-x64.tar.xz -C ~/cli/sf --strip-components 1
+    - export PATH="$HOME/cli/sf/bin:$PATH"
+    - PATH=$HOME/cli/sf/bin:$PATH
+    - ~/cli/sf/bin/sf version
+    - |
+      if [ "$CI_COMMIT_BRANCH" == "UAT-Branch" ]; then
+        echo " "
+        echo "Authenticating in QA sandbox.... :stopwatch:"
+        echo " "
+        sf login org jwt --alias deployOrg --client-id ${secrets.SF_CLIENT_ID} --jwt-key-file accesskey/server.key --set-default --set-default-dev-hub --instance-url https://test.salesforce.com --username ${secrets.SF_USERNAME}
+        echo " "
+        echo "Successfully authenticated in QA sandbox :white_check_mark:"
+        echo " "
+      fi
+  script:
+    - echo "Deployment started ... :soon:"
+    - echo $TEST_CLASSES
+    - echo "sf project deploy start -x manifest/package.xml --target-org deployOrg --ignore-warnings --verbose"
+    - sf project deploy start -x manifest/package.xml --target-org deployOrg --test-level RunSpecifiedTests --tests ${TEST_CLASSES} --ignore-warnings --verbose
+    # - sf project deploy start --source-dir force-app/ --test-level RunAllTestsInOrg --target-org deployOrg --ignore-warnings --verbose
+    - echo "Deployment Finished :dart:"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "UAT-Branch"
