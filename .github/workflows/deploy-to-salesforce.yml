@@ -1,32 +1,46 @@
 name: Deploy to UAT
-  image: ubuntu:latest
-  stage: QA_deployment
-  before_script:
-    - apt-get update
-    - apt-get install -y wget default-jdk unzip xz-utils # Install JDK and wget
-    - wget https://developer.salesforce.com/media/salesforce-cli/sf/channels/stable/sf-linux-x64.tar.xz
-    - mkdir ~/cli
-    - mkdir ~/cli/sf
-    - tar xJf sf-linux-x64.tar.xz -C ~/cli/sf --strip-components 1
-    - export PATH="$HOME/cli/sf/bin:$PATH"
-    - PATH=$HOME/cli/sf/bin:$PATH
-    - ~/cli/sf/bin/sf version
-    - |
-      if [ "$CI_COMMIT_BRANCH" == "UAT-Branch" ]; then
-        echo " "
-        echo "Authenticating in QA sandbox.... :stopwatch:"
-        echo " "
-        sf login org jwt --alias deployOrg --client-id ${secrets.SF_CLIENT_ID} --jwt-key-file accesskey/server.key --set-default --set-default-dev-hub --instance-url https://test.salesforce.com --username ${secrets.SF_USERNAME}
-        echo " "
-        echo "Successfully authenticated in QA sandbox :white_check_mark:"
-        echo " "
-      fi
-  script:
-    - echo "Deployment started ... :soon:"
-    - echo $TEST_CLASSES
-    - echo "sf project deploy start -x manifest/package.xml --target-org deployOrg --ignore-warnings --verbose"
-    - sf project deploy start -x manifest/package.xml --target-org deployOrg --test-level RunSpecifiedTests --tests ${TEST_CLASSES} --ignore-warnings --verbose
-    # - sf project deploy start --source-dir force-app/ --test-level RunAllTestsInOrg --target-org deployOrg --ignore-warnings --verbose
-    - echo "Deployment Finished :dart:"
-  rules:
-    - if: $CI_COMMIT_BRANCH == "UAT-Branch"
+
+on:
+  push:
+    branches:
+      - UAT-Branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SF_CLIENT_ID: ${{ secrets.SF_CONSUMER_KEY }}
+      SF_USERNAME: ${{ secrets.SF_USERNAME }}
+      SF_JWT_KEY: ${{ secrets.SF_JWT_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js (required by Salesforce CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Salesforce CLI
+        run: |
+          npm install --global @salesforce/cli
+
+      - name: Write server.key from GitHub Secret
+        run: |
+          mkdir -p accesskey
+          echo "$SF_JWT_KEY" > accesskey/server.key
+
+      - name: Authenticate to Salesforce org using JWT
+        run: |
+          sf org login jwt --client-id "$SF_CONSUMER_KEY" \
+            --jwt-key-file accesskey/server.key \
+            --username "$SF_USERNAME" \
+            --set-default \
+            --instance-url https://test.salesforce.com
+
+      - name: Deploy to Salesforce
+        run: |
+          echo "Deployment started ..."
+          sf project deploy start -x manifest/package.xml --target-org default --ignore-warnings --verbose
+          echo "Deployment Finished."
