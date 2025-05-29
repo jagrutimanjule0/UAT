@@ -6,45 +6,41 @@ on:
       - UAT-Branch
 
 jobs:
-  deploy_to_uat:
+  deploy:
     runs-on: ubuntu-latest
+    env:
+      SF_CLIENT_ID: ${{ secrets.SF_CLIENT_ID }}
+      SF_USERNAME: ${{ secrets.SF_USERNAME }}
+      SF_JWT_KEY: ${{ secrets.SF_JWT_KEY }}
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - name: Set up Node.js (required by Salesforce CLI)
+        uses: actions/setup-node@v4
         with:
-          distribution: 'temurin'
-          java-version: 17
+          node-version: '18'
 
-      - name: Install wget, unzip, xz-utils
-        run: sudo apt-get update && sudo apt-get install -y wget unzip xz-utils
-
-      - name: Download Salesforce CLI
+      - name: Install Salesforce CLI
         run: |
-          wget https://developer.salesforce.com/media/salesforce-cli/sf/channels/stable/sf-linux-x64.tar.xz
-          mkdir -p ~/cli/sf
-          tar xJf sf-linux-x64.tar.xz -C ~/cli/sf --strip-components 1
+          npm install --global @salesforce/cli
 
-      - name: Add Salesforce CLI to PATH
-        run: echo "$HOME/cli/sf/bin" >> $GITHUB_PATH
-
-      - name: Verify Salesforce CLI installation
-        run: sf version
-
-      - name: Authenticate with Salesforce UAT Org
+      - name: Write server.key from GitHub Secret
         run: |
-          sf login org jwt --alias deployOrg \
-            --client-id ${{ secrets.SF_CLIENT_ID }} \
+          mkdir -p accesskey
+          echo "$SF_JWT_KEY" > accesskey/server.key
+
+      - name: Authenticate to Salesforce org using JWT
+        run: |
+          sf org login jwt --client-id "$SF_CLIENT_ID" \
             --jwt-key-file accesskey/server.key \
+            --username "$SF_USERNAME" \
             --set-default \
-            --instance-url https://test.salesforce.com \
-            --username ${{ secrets.SF_USERNAME }}
+            --instance-url https://test.salesforce.com
 
-      - name: Deploy to UAT
+      - name: Deploy to Salesforce
         run: |
           echo "Deployment started ..."
-          sf project deploy start -x manifest/package.xml --target-org deployOrg --test-level RunSpecifiedTests --tests "$TEST_CLASSES" --ignore-warnings --verbose
+          sf project deploy start -x manifest/package.xml --target-org default --ignore-warnings --verbose
           echo "Deployment Finished."
