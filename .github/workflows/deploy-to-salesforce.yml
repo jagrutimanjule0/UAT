@@ -1,31 +1,46 @@
-stages:
-  - UAT_deployment
+name: Deploy to UAT
 
-deploy_to_uat:
-  image: openjdk:17-slim
-  stage: UAT_deployment
-  before_script:
-    - apt-get update
-    - apt-get install -y wget default-jdk unzip xz-utils
-    - wget https://developer.salesforce.com/media/salesforce-cli/sf/channels/stable/sf-linux-x64.tar.xz
-    - mkdir -p ~/cli/sf
-    - tar xJf sf-linux-x64.tar.xz -C ~/cli/sf --strip-components 1
-    - export PATH="$HOME/cli/sf/bin:$PATH"
-    - sf version
-    - |
-      if [ "$CI_COMMIT_BRANCH" == "UAT-Branch" ]; then
-        echo "Authenticating in UAT sandbox..."
-        sf login org jwt --alias deployOrg \
-          --client-id $SF_CLIENT_ID \
-          --jwt-key-file accesskey/server.key \
-          --set-default \
-          --instance-url https://test.salesforce.com \
-          --username $SF_USERNAME
-        echo "Authenticated in UAT sandbox."
-      fi
-  script:
-    - echo "Deployment started ..."
-    - sf project deploy start -x manifest/package.xml --target-org deployOrg --test-level RunSpecifiedTests --tests "$TEST_CLASSES" --ignore-warnings --verbose
-    - echo "Deployment Finished."
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "UAT-Branch"'
+on:
+  push:
+    branches:
+      - UAT-Branch
+
+jobs:
+  deploy_to_uat:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      - name: Install wget, unzip, xz-utils
+        run: sudo apt-get update && sudo apt-get install -y wget unzip xz-utils
+
+      - name: Download Salesforce CLI
+        run: |
+          wget https://developer.salesforce.com/media/salesforce-cli/sf/channels/stable/sf-linux-x64.tar.xz
+          mkdir -p ~/cli/sf
+          tar xJf sf-linux-x64.tar.xz -C ~/cli/sf --strip-components 1
+          echo "$HOME/cli/sf/bin" >> $GITHUB_PATH
+          sf version
+
+      - name: Authenticate with Salesforce UAT Org
+        run: |
+          sf login org jwt --alias deployOrg \
+            --client-id ${{ secrets.SF_CLIENT_ID }} \
+            --jwt-key-file accesskey/server.key \
+            --set-default \
+            --instance-url https://test.salesforce.com \
+            --username ${{ secrets.SF_USERNAME }}
+
+      - name: Deploy to UAT
+        run: |
+          echo "Deployment started ..."
+          sf project deploy start -x manifest/package.xml --target-org deployOrg --test-level RunSpecifiedTests --tests "$TEST_CLASSES" --ignore-warnings --verbose
+          echo "Deployment Finished."
