@@ -1,0 +1,31 @@
+name: Deploy to Salesforce
+
+on:
+  push:
+    branches:
+      - UAT-Branch   # change this to your target branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Salesforce CLI
+        run: |
+          npm install sfdx-cli --global
+
+      - name: Authenticate to Salesforce (JWT)
+        run: |
+          echo "${{ secrets.SF_JWT_KEY }}" > server.key
+          sfdx auth:jwt:grant \
+            --username "${{ secrets.SF_USERNAME }}" \
+            --clientid "${{ secrets.SF_CLIENT_ID }}" \
+            --jwtkeyfile server.key \
+            --setdefaultdevhubusername \
+            --instanceurl "${{ secrets.https://login.salesforce.com }}"
+      - name: Deploy source
+        run: |
+          sfdx force:source:deploy -p force-app --json --loglevel fatal
