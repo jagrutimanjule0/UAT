@@ -1,7 +1,10 @@
 name: Deploy to UAT
-  image: ubuntu:latest
-  stage: QA_deployment
-  before_script:
+  
+image: ubuntu:latest
+  
+stage: QA_deployment
+  
+before_script:
     - apt-get update
     - apt-get install -y wget default-jdk unzip xz-utils # Install JDK and wget
     - wget https://developer.salesforce.com/media/salesforce-cli/sf/channels/stable/sf-linux-x64.tar.xz
@@ -21,12 +24,14 @@ name: Deploy to UAT
         echo "Successfully authenticated in QA sandbox :white_check_mark:"
         echo " "
       fi
-  script:
+  
+script:
     - echo "Deployment started ... :soon:"
     - echo $TEST_CLASSES
     - echo "sf project deploy start -x manifest/package.xml --target-org deployOrg --ignore-warnings --verbose"
     - sf project deploy start -x manifest/package.xml --target-org deployOrg --test-level RunSpecifiedTests --tests ${TEST_CLASSES} --ignore-warnings --verbose
     # - sf project deploy start --source-dir force-app/ --test-level RunAllTestsInOrg --target-org deployOrg --ignore-warnings --verbose
     - echo "Deployment Finished :dart:"
-  rules:
+  
+rules:
     - if: $CI_COMMIT_BRANCH == "UAT-Branch"
