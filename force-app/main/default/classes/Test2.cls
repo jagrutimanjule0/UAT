@@ -1,5 +1,5 @@
 public with sharing class Test2 {
     public Test2() {
-        System.debug('Test2 update File');
+        System.debug('Test2 update2 File');
     }
 }
